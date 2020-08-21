@@ -38,7 +38,7 @@
                     <el-input v-model.number="ruleForm.code"></el-input>
                 </el-col>
                 <el-col :span="9">
-                    <el-button type="success" class="btn-block" @click="submitForm('ruleForm')" minLength="6" maxLength="6">获取验证码</el-button>
+                    <el-button type="success" class="btn-block" @click="getSms()" minLength="6" maxLength="6">获取验证码</el-button>
                 </el-col>
             </el-row>
         </el-form-item>
@@ -53,6 +53,8 @@
 <script>
 import {reactive, ref, onMounted} from '@vue/composition-api';
 import {validateEmail, strFilter, validatePass, validateVcode} from '@/utils/validate.js'
+import {GetSms} from '@/service/api_2/login.js'
+
 export default {
     name: "Login",
     setup(props, context){
@@ -129,7 +131,19 @@ export default {
             currentIndex.value = index;
         }
 
+        const getSms = () => {
+            // console.log(ruleForm.userName)
+
+            GetSms({username: ruleForm.userName})
+        }
+
         const submitForm = (formName => {
+            axios.get('user?ID=123456').then(function(res){
+                console.log(res)
+            }).catch(function(err){
+                console.log(err)
+            })
+
             context.refs[formName].validate((valid) => {
                 if (valid) {
                     alert("submit!");
@@ -141,7 +155,8 @@ export default {
         })
 
         // 挂载完成后
-        // onMounted(() => {})
+        onMounted(() => {
+        })
 
         return {
             menuTab,
@@ -149,6 +164,7 @@ export default {
             rules,
             currentIndex,
             toggleMenu,
+            getSms,
             submitForm
         }
     }
