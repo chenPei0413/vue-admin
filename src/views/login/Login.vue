@@ -20,7 +20,7 @@
         label-position="top"
         size="medium"
       >
-        <el-form-item label="用户名" prop="userName">
+        <el-form-item label="邮箱" prop="userName">
             <el-input type="text" v-model="ruleForm.userName" autocomplete="off"></el-input>
         </el-form-item>
 
@@ -44,7 +44,9 @@
         </el-form-item>
 
         <el-form-item>
-          <el-button type="danger" class="login-btn btn-block" @click="submitForm('ruleForm')">提交</el-button>
+          <el-button type="danger" class="login-btn btn-block" :disabled="loginBtnStatus" @click="submitForm('ruleForm')">
+              {{currentIndex === 0 ? '登录' : '注册'}}
+            </el-button>
         </el-form-item>
       </el-form>
     </div>
@@ -57,14 +59,14 @@ import {GetSms} from '@/service/api_2/login.js'
 
 export default {
     name: "Login",
-    setup(props, context){
+    setup(props, {refs, root}){
         // 验证用户名
         let validateUserName = (rule, value, callback) => {
             let reg = /^([a-zA-Z]|[0-9])(\w|\-)+@[a-zA-Z0-9]+\.([a-zA-Z]{2,4})$/
             if (value === "") {
                 callback(new Error("请输入用户名"));
             }else if(!validateEmail(value)){
-                callback(new Error("用户名格式有误"));
+                callback(new Error("邮箱格式有误"));
             } else {
                 callback();
             }
@@ -109,7 +111,8 @@ export default {
             }
         };
         // 基础类型
-        const currentIndex = ref(0)
+        const currentIndex = ref(0);
+        const loginBtnStatus = ref(false);
         // 引用对象类型用reactive
         const menuTab = reactive([
             { text: "登录" },
@@ -132,19 +135,27 @@ export default {
         }
 
         const getSms = () => {
-            // console.log(ruleForm.userName)
-
-            GetSms({username: ruleForm.userName})
+            // 验证邮箱是否为空
+            if(ruleForm.userName === ''){
+                root.$message.error('邮箱不能为空！');
+                return false
+            }
+            // 验证邮箱是否含有特殊字符串
+            if(!validateEmail(ruleForm.userName)){
+                root.$message.error('邮箱格式有误');
+                return false
+            }
+            // 获取验证码
+            GetSms({username: ruleForm.userName, module: 'login'}).then(res => {
+                console.log(res)
+            }).catch(err => {
+                console.log(err)
+            })
+            
         }
 
         const submitForm = (formName => {
-            axios.get('user?ID=123456').then(function(res){
-                console.log(res)
-            }).catch(function(err){
-                console.log(err)
-            })
-
-            context.refs[formName].validate((valid) => {
+            refs[formName].validate((valid) => {
                 if (valid) {
                     alert("submit!");
                 } else {
@@ -163,6 +174,7 @@ export default {
             ruleForm,
             rules,
             currentIndex,
+            loginBtnStatus,
             toggleMenu,
             getSms,
             submitForm
