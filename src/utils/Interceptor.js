@@ -5,10 +5,11 @@ const BASEURL = process.env.NODE_ENV === 'production' ? '' : 'devApi';
 // 创建拦截器
 const instance = axios.create({
     baseURL: BASEURL,
-    timeout: 1000
+    timeout: 10000
 });
 // 请求拦截器
 instance.interceptors.request.use(function (config){
+    console.log(config.headers)
     return config;
 }, function(err){
     return Promise.reject(err)

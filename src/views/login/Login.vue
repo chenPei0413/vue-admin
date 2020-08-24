@@ -14,7 +14,7 @@
         :model="ruleForm"
         status-icon
         :rules="rules"
-        ref="ruleForm"
+        ref="loginForm"
         label-width="100px"
         class="demo-ruleForm"
         label-position="top"
@@ -35,16 +35,16 @@
         <el-form-item label="验证码" prop="code">
             <el-row :gutter="10">
                 <el-col :span="15">
-                    <el-input v-model.number="ruleForm.code"></el-input>
+                    <el-input v-model="ruleForm.code"></el-input>
                 </el-col>
                 <el-col :span="9">
-                    <el-button type="success" class="btn-block" @click="getSms()" minLength="6" maxLength="6">获取验证码</el-button>
+                    <el-button type="success" class="btn-block" @click="getSms()" minLength="6" maxLength="6" :disabled="codeBtnStatus.status">{{codeBtnStatus.text}}</el-button>
                 </el-col>
             </el-row>
         </el-form-item>
 
         <el-form-item>
-          <el-button type="danger" class="login-btn btn-block" :disabled="loginBtnStatus" @click="submitForm('ruleForm')">
+          <el-button type="danger" class="login-btn btn-block" :disabled="loginBtnStatus" @click="submitForm('loginForm')">
               {{currentIndex === 0 ? '登录' : '注册'}}
             </el-button>
         </el-form-item>
@@ -53,9 +53,10 @@
   </div>
 </template>
 <script>
+import sha1 from 'js-sha1';
 import {reactive, ref, onMounted} from '@vue/composition-api';
 import {validateEmail, strFilter, validatePass, validateVcode} from '@/utils/validate.js'
-import {GetSms} from '@/service/api_2/login.js'
+import {GetSms, Login, Register} from '@/service/api_2/login.js'
 
 export default {
     name: "Login",
@@ -105,22 +106,27 @@ export default {
             if (value === '') {
                 return callback(new Error("验证码不能为空"));
             }else if(!validateVcode(value)){
-                return callback(new Error("验证码为6位数字"));
+                return callback(new Error("验证码为6位(数字+字母)"));
             }else{
                 callback();
             }
         };
         // 基础类型
-        const currentIndex = ref(0);
-        const loginBtnStatus = ref(false);
+        const currentIndex = ref(0);            
+        const loginBtnStatus = ref(true);   //登录按钮状态
+        const timer = ref(null);            // 倒计时
         // 引用对象类型用reactive
         const menuTab = reactive([
-            { text: "登录" },
-            { text: "注册" }
+            { text: "登录", type: 'login' },
+            { text: "注册", type: 'register' }
         ])
+        let codeBtnStatus = reactive({
+            status: false,
+            text: '获取验证码'
+        })
         const ruleForm = reactive({
-            userName: "",
-            password: "",
+            userName: "2726454210@qq.com",
+            password: "111111a",
             passwords: "",
             code: "",
         })
@@ -130,10 +136,15 @@ export default {
             passwords: [{ validator: validatePassWords, trigger: "blur" }],
             code: [{ validator: validateCode, trigger: "blur" }],
         })
+        // 切换模块
         const toggleMenu = index =>  {
-            currentIndex.value = index;
+            if(currentIndex.value !== index){
+                currentIndex.value = index;
+                resetFromData()
+                clearCountDown()
+            }
         }
-
+        // 获取验证码
         const getSms = () => {
             // 验证邮箱是否为空
             if(ruleForm.userName === ''){
@@ -145,24 +156,97 @@ export default {
                 root.$message.error('邮箱格式有误');
                 return false
             }
-            // 获取验证码
-            GetSms({username: ruleForm.userName, module: 'login'}).then(res => {
-                console.log(res)
-            }).catch(err => {
-                console.log(err)
-            })
-            
-        }
 
+            // 获取验证码
+            let requestData = reactive({
+                username: ruleForm.userName,
+                module: menuTab[currentIndex.value].type
+            })
+            upDataBtnStatus({
+                status: true,
+                text: '发送中'
+            })
+            setTimeout(() => {
+                GetSms(requestData).then(res => {
+                    countDown(30)
+                    loginBtnStatus.value = false
+                }).catch(err => {
+                    upDataBtnStatus({
+                        status: false,
+                        text: '重新发送'
+                    })
+                })
+            }, 3000)
+        }
+        // 注册|登录
         const submitForm = (formName => {
-            refs[formName].validate((valid) => {
+            refs['loginForm'].validate((valid) => {
                 if (valid) {
-                    alert("submit!");
+                    if(menuTab[currentIndex.value].type === 'login'){
+                        let requestData = {
+                            username: ruleForm.userName,
+                            password: sha1(ruleForm.password),
+                            code: ruleForm.code,
+                        }
+                        Login(requestData).then(res => {
+                            root.$router.push({
+                                name: 'Console'
+                            })
+                        }).catch(err => {
+                            console.log(err)
+                        })
+                    }else{
+                        let requestData = {
+                            username: ruleForm.userName,
+                            password: sha1(ruleForm.password),
+                            code: ruleForm.code,
+                            module: 'register'
+                        }
+                        Register(requestData).then(res => {
+                            // 当注册成功就跳回登录模块
+                            toggleMenu(0)
+                        }).catch(err => {
+                            toggleMenu(0)
+                        })
+                    }
                 } else {
                     console.log("error submit!!");
                     return false;
                 }
             });
+        })
+        // 重置表单
+        const resetFromData = () => {
+            refs['loginForm'].resetFields();
+        }
+        // 更新按钮
+        const upDataBtnStatus = (params) => {
+            codeBtnStatus.status = params.status;
+            codeBtnStatus.text = params.text;
+        }
+        // 倒计时
+        const countDown = (number) => {
+            timer.value = setInterval(() => {
+                number--;
+                if(number === 0){
+                    upDataBtnStatus({
+                        status: false,
+                        text: `重新发送`
+                    })
+                    clearInterval(timer.value)
+                }else{
+                    upDataBtnStatus({
+                        status: true,
+                        text: `倒计时${number}秒`
+                    })
+                }
+            }, 1000)
+        }
+        // 切换模块并清除倒计时
+        const clearCountDown = (() => {
+            codeBtnStatus.status = false;
+            codeBtnStatus.text = '获取验证码';
+            clearInterval(timer.value)
         })
 
         // 挂载完成后
@@ -175,6 +259,7 @@ export default {
             rules,
             currentIndex,
             loginBtnStatus,
+            codeBtnStatus,
             toggleMenu,
             getSms,
             submitForm
@@ -183,36 +268,35 @@ export default {
 };
 </script>
 <style lang="less" scoped>
-#login {
-  height: 100vh;
-  background: #344a5f;
-}
-.login-wrap {
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-}
-.menu-tab {
-  text-align: center;
-  li {
-    display: inline-block;
-    width: 88px;
-    line-height: 36px;
-    font-size: 14px;
-    color: #fff;
-    border-radius: 2px;
-    cursor: pointer;
-  }
-}
-.current {
-  background: rgba(0, 0, 0, 0.1);
-}
+    #login {
+    height: 100vh;
+    background: #344a5f;
+    }
+    .login-wrap {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    }
+    .menu-tab {
+    text-align: center;
+    li {
+        display: inline-block;
+        width: 88px;
+        line-height: 36px;
+        font-size: 14px;
+        color: #fff;
+        border-radius: 2px;
+        cursor: pointer;
+    }
+    }
+    .current {
+    background: rgba(0, 0, 0, 0.1);
+    }
 
 </style>
-
 <style>
     .el-form--label-top .el-form-item__label{
         color: white!important;
