@@ -1,0 +1,12 @@
+@mixin labelDom($align, $width, $line-height: "normal", $margin-right: 0){
+    label{
+        float: left;
+        line-height: $line-height + px;
+        width: $width + px;
+        text-align: $align;
+        margin-right: $margin-right + px;
+    }
+    .wrap_content{
+        margin-left: $width + px;
+    }
+}
